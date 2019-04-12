@@ -30,7 +30,7 @@ import java.util.concurrent.atomic.AtomicInteger
  */
 class Transaction(logManager: LogManager, bufferManager: BufferManager, lockTable: LockTable, private val fileManager: FileManager) {
 
-    private val txnum = TxNum(nextTxNum.getAndDecrement())
+    private val txnum = TransactionNumber(nextTxNum.getAndDecrement())
     private val recoveryManager = RecoveryManager(txnum, logManager, bufferManager)
     private val concurrencyManager = ConcurrencyManager(lockTable)
     private val myBuffers = BufferList(bufferManager)
@@ -38,13 +38,13 @@ class Transaction(logManager: LogManager, bufferManager: BufferManager, lockTabl
     fun commit() {
         myBuffers.unpinAll()
         recoveryManager.commit()
-        concurrencyManager.release()
+        concurrencyManager.releaseAllLocks()
     }
 
     fun rollback() {
         myBuffers.unpinAll()
         recoveryManager.rollback()
-        concurrencyManager.release()
+        concurrencyManager.releaseAllLocks()
     }
 
     fun recover() {
@@ -60,25 +60,25 @@ class Transaction(logManager: LogManager, bufferManager: BufferManager, lockTabl
     }
 
     fun getValue(block: Block, offset: Int, type: SqlType): SqlValue {
-        concurrencyManager.sLock(block)
+        concurrencyManager.acquireSharedLock(block)
         val buffer = myBuffers.getBuffer(block)
         return buffer.getValue(offset, type)
     }
 
     fun setValue(block: Block, offset: Int, value: SqlValue) {
-        concurrencyManager.xLock(block)
+        concurrencyManager.acquireExclusiveLock(block)
         val buffer = myBuffers.getBuffer(block)
         val lsn = recoveryManager.setValue(buffer, offset, value)
         buffer.setValue(offset, value, txnum, lsn)
     }
 
     fun size(fileName: FileName): Int {
-        concurrencyManager.sLock(eofBlock(fileName))
+        concurrencyManager.acquireSharedLock(eofBlock(fileName))
         return fileManager.size(fileName)
     }
 
     fun append(fileName: FileName, formatter: PageFormatter): Block {
-        concurrencyManager.xLock(eofBlock(fileName))
+        concurrencyManager.acquireExclusiveLock(eofBlock(fileName))
         val block = myBuffers.pinNew(fileName, formatter)
         unpin(block)
         return block

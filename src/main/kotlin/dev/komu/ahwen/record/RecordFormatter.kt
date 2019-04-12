@@ -11,13 +11,13 @@ import dev.komu.ahwen.file.set
 class RecordFormatter(private val ti: TableInfo) : PageFormatter {
 
     override fun format(page: Page) {
-        val recSize = ti.recordLength + Int.SIZE_BYTES
+        val recordSize = ti.recordLength + Int.SIZE_BYTES
 
-        var pos = 0
-        while (pos + recSize <= BLOCK_SIZE) {
-            page[pos] = RecordPage.EMPTY
-            makeDefaultRecord(page, pos)
-            pos += recSize
+        var position = 0
+        while (position + recordSize <= BLOCK_SIZE) {
+            page[position] = RecordPage.EMPTY
+            makeDefaultRecord(page, position)
+            position += recordSize
         }
     }
 

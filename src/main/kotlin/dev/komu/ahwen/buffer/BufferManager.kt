@@ -3,7 +3,7 @@ package dev.komu.ahwen.buffer
 import dev.komu.ahwen.file.Block
 import dev.komu.ahwen.file.FileManager
 import dev.komu.ahwen.log.LogManager
-import dev.komu.ahwen.tx.TxNum
+import dev.komu.ahwen.tx.TransactionNumber
 import dev.komu.ahwen.types.FileName
 import dev.komu.ahwen.utils.await
 import java.time.Duration
@@ -82,7 +82,7 @@ class BufferManager(bufferCount: Int, fileManager: FileManager, logManager: LogM
     /**
      * Flushes all buffers modified in transaction [txnum].
      */
-    fun flushAll(txnum: TxNum) {
+    fun flushAll(txnum: TransactionNumber) {
         bufferManager.flushAll(txnum)
     }
 

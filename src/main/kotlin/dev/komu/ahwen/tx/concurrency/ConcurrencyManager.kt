@@ -14,24 +14,24 @@ class ConcurrencyManager(private val lockTable: LockTable) {
 
     private val locks = mutableMapOf<Block, LockType>()
 
-    fun sLock(block: Block) {
+    fun acquireSharedLock(block: Block) {
         if (block !in locks) {
-            lockTable.sLock(block)
+            lockTable.acquireSharedLockTo(block)
             locks[block] = LockType.SHARED
         }
     }
 
-    fun xLock(block: Block) {
+    fun acquireExclusiveLock(block: Block) {
         if (locks[block] != LockType.EXCLUSIVE) {
-            sLock(block)
-            lockTable.xLock(block)
+            acquireSharedLock(block)
+            lockTable.acquireExclusiveLockTo(block)
             locks[block] = LockType.EXCLUSIVE
         }
     }
 
-    fun release() {
+    fun releaseAllLocks() {
         for (block in locks.keys)
-            lockTable.unlock(block)
+            lockTable.releaseLockOn(block)
         locks.clear()
     }
 

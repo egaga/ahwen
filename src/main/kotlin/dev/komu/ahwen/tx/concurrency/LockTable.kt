@@ -28,15 +28,15 @@ class LockTable {
      *
      * @throws LockAbortException if timeout occurs
      */
-    fun sLock(block: Block) {
+    fun acquireSharedLockTo(block: Block) {
         lock.withLock {
             try {
                 val startTime = Instant.now()
-                while (hasXlock(block) && !waitingTooLong(startTime)) {
+                while (hasExclusiveLock(block) && !waitingTooLong(startTime)) {
                     condition.await(MAX_TIME)
                 }
 
-                if (hasXlock(block))
+                if (hasExclusiveLock(block))
                     throw LockAbortException()
 
                 val value = getLockVal(block)
@@ -53,15 +53,15 @@ class LockTable {
      *
      * @throws LockAbortException if timeout or deadlock occurs
      */
-    fun xLock(block: Block) {
+    fun acquireExclusiveLockTo(block: Block) {
         lock.withLock {
             try {
                 val startTime = Instant.now()
-                while (hasOtherSLocks(block) && !waitingTooLong(startTime)) {
+                while (hasOtherSharedLocks(block) && !waitingTooLong(startTime)) {
                     condition.await(MAX_TIME)
                 }
 
-                if (hasOtherSLocks(block))
+                if (hasOtherSharedLocks(block))
                     throw LockAbortException()
 
                 locks[block] = -1
@@ -75,7 +75,7 @@ class LockTable {
     /**
      * Releases a lock on the block.
      */
-    fun unlock(block: Block) {
+    fun releaseLockOn(block: Block) {
         lock.withLock {
             val value = getLockVal(block)
             if (value > 1)
@@ -86,10 +86,10 @@ class LockTable {
         }
     }
 
-    private fun hasXlock(block: Block): Boolean =
+    private fun hasExclusiveLock(block: Block): Boolean =
         getLockVal(block) < 0
 
-    private fun hasOtherSLocks(block: Block): Boolean =
+    private fun hasOtherSharedLocks(block: Block): Boolean =
         getLockVal(block) > 1
 
     private fun getLockVal(block: Block): Int =

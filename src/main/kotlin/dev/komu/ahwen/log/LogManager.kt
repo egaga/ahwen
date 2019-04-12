@@ -5,7 +5,7 @@ import dev.komu.ahwen.file.Page.Companion.BLOCK_SIZE
 import dev.komu.ahwen.file.Page.Companion.INT_SIZE
 import dev.komu.ahwen.query.SqlInt
 import dev.komu.ahwen.query.SqlString
-import dev.komu.ahwen.tx.TxNum
+import dev.komu.ahwen.tx.TransactionNumber
 import dev.komu.ahwen.types.FileName
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
@@ -65,14 +65,14 @@ class LogManager(
 
     /**
      * Append a new record consisting of given components. Appending the record does not
-     * guarantee that it will be flushed to disk immediately, but appending returns an [LSN]
+     * guarantee that it will be flushed to disk immediately, but appending returns an [LogSequenceNumber]
      * which can later be passed to [flush] to make sure that all records up to (and including)
      * this record are flushed to disk.
      *
-     * Note that passed in components are typed as [Any], but only [Int], [String] and [TxNum] values
+     * Note that passed in components are typed as [Any], but only [Int], [String] and [TransactionNumber] values
      * are currently supported.
      */
-    fun append(vararg values: Any): LSN {
+    fun append(vararg values: Any): LogSequenceNumber {
         val constants = values.map { convertValue(it) }
         lock.withLock {
             val recordSize = INT_SIZE + constants.sumBy { it.representationSize }
@@ -89,16 +89,16 @@ class LogManager(
 
             finalizeRecord()
 
-            return currentLSN
+            return currentLogSequenceNumber
         }
     }
 
     /**
-     * Guarantees that log is flushed at least until the [append] call that returned given [LSN].
+     * Guarantees that log is flushed at least until the [append] call that returned given [LogSequenceNumber].
      */
-    fun flush(lsn: LSN) {
+    fun flush(lsn: LogSequenceNumber) {
         lock.withLock {
-            if (lsn >= currentLSN)
+            if (lsn >= currentLogSequenceNumber)
                 flush()
         }
     }
@@ -113,8 +113,8 @@ class LogManager(
         }
     }
 
-    private val currentLSN: LSN
-        get() = LSN(currentBlock.number)
+    private val currentLogSequenceNumber: LogSequenceNumber
+        get() = LogSequenceNumber(currentBlock.number)
 
     private fun flush() {
         lastPage.write(currentBlock)
@@ -134,9 +134,9 @@ class LogManager(
     }
 
     private var lastRecordPosition: Int
-        get() = lastPage.getInt(LAST_POS_OFFSET)
+        get() = lastPage.getInt(LAST_POSITION_OFFSET)
         set(value) {
-            lastPage[LAST_POS_OFFSET] = value
+            lastPage[LAST_POSITION_OFFSET] = value
         }
 
     private class LogIterator(fileManager: FileManager, private var block: Block) : Iterator<BasicLogRecord> {
@@ -146,7 +146,7 @@ class LogManager(
 
         init {
             page.read(block)
-            currentRecord = page.getInt(LAST_POS_OFFSET)
+            currentRecord = page.getInt(LAST_POSITION_OFFSET)
         }
 
         override fun hasNext() = currentRecord > 0 || block.number > 0
@@ -162,20 +162,20 @@ class LogManager(
         private fun moveToNextBlock() {
             block = Block(block.filename, block.number - 1)
             page.read(block)
-            currentRecord = page.getInt(LAST_POS_OFFSET)
+            currentRecord = page.getInt(LAST_POSITION_OFFSET)
         }
     }
 
     companion object {
 
         /** The offset within block where the position of last block is stored */
-        private const val LAST_POS_OFFSET = 0
+        private const val LAST_POSITION_OFFSET = 0
 
         private fun convertValue(value: Any) = when (value) {
             is String ->
                 SqlString(value)
-            is TxNum ->
-                SqlInt(value.txnum)
+            is TransactionNumber ->
+                SqlInt(value.value)
             is Int ->
                 SqlInt(value)
             is FileName ->

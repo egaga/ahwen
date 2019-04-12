@@ -21,26 +21,26 @@ class IndexManager(
 
     init {
         if (isNew) {
-            tableManager.createTable(TBL_INDEX_CAT, Schema {
-                stringField(COL_INDEX_NAME, MAX_NAME)
-                stringField(COL_TABLE_NAME, MAX_NAME)
-                stringField(COL_FIELD_NAME, MAX_NAME)
+            tableManager.createTable(TABLE_INDEX_CAT, Schema {
+                stringField(COLUMN_INDEX_NAME, MAX_NAME)
+                stringField(COLUMN_TABLE_NAME, MAX_NAME)
+                stringField(COLUMN_FIELD_NAME, MAX_NAME)
             }, tx)
         }
 
-        ti = tableManager.getTableInfo(TBL_INDEX_CAT, tx)
+        ti = tableManager.getTableInfo(TABLE_INDEX_CAT, tx)
     }
 
     fun createIndex(indexName: IndexName, tableName: TableName, fieldName: ColumnName, tx: Transaction) {
-        TableManager.checkNameLength(indexName.value, COL_INDEX_NAME)
-        TableManager.checkNameLength(tableName.value, COL_TABLE_NAME)
-        TableManager.checkNameLength(fieldName.value, COL_FIELD_NAME)
+        TableManager.checkNameLength(indexName.value, COLUMN_INDEX_NAME)
+        TableManager.checkNameLength(tableName.value, COLUMN_TABLE_NAME)
+        TableManager.checkNameLength(fieldName.value, COLUMN_FIELD_NAME)
 
         ti.open(tx).use { rf ->
             rf.insertRow(
-                COL_INDEX_NAME to SqlString(indexName.value),
-                COL_TABLE_NAME to SqlString(tableName.value),
-                COL_FIELD_NAME to SqlString(fieldName.value)
+                COLUMN_INDEX_NAME to SqlString(indexName.value),
+                COLUMN_TABLE_NAME to SqlString(tableName.value),
+                COLUMN_FIELD_NAME to SqlString(fieldName.value)
             )
         }
     }
@@ -49,9 +49,9 @@ class IndexManager(
         ti.open(tx).use { rf ->
             val result = mutableMapOf<ColumnName, IndexInfo>()
             rf.forEach {
-                if (rf.getString(COL_TABLE_NAME) == tableName.value) {
-                    val indexName = IndexName(rf.getString(COL_INDEX_NAME))
-                    val fieldName = ColumnName(rf.getString(COL_FIELD_NAME))
+                if (rf.getString(COLUMN_TABLE_NAME) == tableName.value) {
+                    val indexName = IndexName(rf.getString(COLUMN_INDEX_NAME))
+                    val fieldName = ColumnName(rf.getString(COLUMN_FIELD_NAME))
                     result[fieldName] = IndexInfo(indexName, tableName, fieldName, tx, metadataManager)
                 }
             }
@@ -60,9 +60,9 @@ class IndexManager(
     }
 
     companion object {
-        private val TBL_INDEX_CAT = TableName("idxcat")
-        private val COL_INDEX_NAME = ColumnName("indexName")
-        private val COL_TABLE_NAME = ColumnName("tableName")
-        private val COL_FIELD_NAME = ColumnName("fieldName")
+        private val TABLE_INDEX_CAT = TableName("idxcat")
+        private val COLUMN_INDEX_NAME = ColumnName("indexName")
+        private val COLUMN_TABLE_NAME = ColumnName("tableName")
+        private val COLUMN_FIELD_NAME = ColumnName("fieldName")
     }
 }

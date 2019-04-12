@@ -3,11 +3,11 @@ package dev.komu.ahwen.tx.recovery
 import dev.komu.ahwen.buffer.BufferManager
 import dev.komu.ahwen.file.Block
 import dev.komu.ahwen.log.BasicLogRecord
-import dev.komu.ahwen.log.LSN
+import dev.komu.ahwen.log.LogSequenceNumber
 import dev.komu.ahwen.log.LogManager
 import dev.komu.ahwen.query.SqlInt
 import dev.komu.ahwen.query.SqlString
-import dev.komu.ahwen.tx.TxNum
+import dev.komu.ahwen.tx.TransactionNumber
 import dev.komu.ahwen.types.FileName
 
 /**
@@ -19,17 +19,17 @@ sealed class LogRecord {
      * Identifier for the transaction that this change belongs to or
      * `null` if the record is not logically related to any transaction.
      */
-    abstract val txNumber: TxNum?
+    abstract val txNumber: TransactionNumber?
 
     /**
      * Serializes this record to given log-manager.
      */
-    abstract fun writeToLog(logManager: LogManager): LSN
+    abstract fun writeToLog(logManager: LogManager): LogSequenceNumber
 
     /**
      * Undoes the changes represented by this log-record.
      */
-    open fun undo(txnum: TxNum, bufferManager: BufferManager) {
+    open fun undo(txnum: TransactionNumber, bufferManager: BufferManager) {
     }
 
     companion object {
@@ -66,10 +66,10 @@ sealed class LogRecord {
  */
 class CheckPointRecord : LogRecord() {
 
-    override val txNumber: TxNum?
+    override val txNumber: TransactionNumber?
         get() = null
 
-    override fun writeToLog(logManager: LogManager): LSN =
+    override fun writeToLog(logManager: LogManager): LogSequenceNumber =
         logManager.append(CHECKPOINT)
 
     companion object {
@@ -83,15 +83,15 @@ class CheckPointRecord : LogRecord() {
 /**
  * Marks the beginning of a transaction.
  */
-class StartRecord(override val txNumber: TxNum) : LogRecord() {
+class StartRecord(override val txNumber: TransactionNumber) : LogRecord() {
 
-    override fun writeToLog(logManager: LogManager): LSN =
+    override fun writeToLog(logManager: LogManager): LogSequenceNumber =
         logManager.append(START, txNumber)
 
     companion object {
 
         fun from(rec: BasicLogRecord): StartRecord {
-            val tx = TxNum(rec.nextInt())
+            val tx = TransactionNumber(rec.nextInt())
             return StartRecord(tx)
         }
     }
@@ -100,15 +100,15 @@ class StartRecord(override val txNumber: TxNum) : LogRecord() {
 /**
  * Marks a transaction as committed.
  */
-class CommitRecord(override val txNumber: TxNum) : LogRecord() {
+class CommitRecord(override val txNumber: TransactionNumber) : LogRecord() {
 
-    override fun writeToLog(logManager: LogManager): LSN =
+    override fun writeToLog(logManager: LogManager): LogSequenceNumber =
         logManager.append(COMMIT, txNumber)
 
     companion object {
 
         fun from(rec: BasicLogRecord): CommitRecord {
-            val tx = TxNum(rec.nextInt())
+            val tx = TransactionNumber(rec.nextInt())
             return CommitRecord(tx)
         }
     }
@@ -117,15 +117,15 @@ class CommitRecord(override val txNumber: TxNum) : LogRecord() {
 /**
  * Marks a transaction as rolled back.
  */
-class RollbackRecord(override val txNumber: TxNum) : LogRecord() {
+class RollbackRecord(override val txNumber: TransactionNumber) : LogRecord() {
 
-    override fun writeToLog(logManager: LogManager): LSN =
+    override fun writeToLog(logManager: LogManager): LogSequenceNumber =
         logManager.append(ROLLBACK, txNumber)
 
     companion object {
 
         fun from(rec: BasicLogRecord): RollbackRecord {
-            val tx = TxNum(rec.nextInt())
+            val tx = TransactionNumber(rec.nextInt())
             return RollbackRecord(tx)
         }
     }
@@ -135,25 +135,25 @@ class RollbackRecord(override val txNumber: TxNum) : LogRecord() {
  * Undo record for changing an int.
  */
 class SetIntRecord(
-    override val txNumber: TxNum,
-    private val block: Block,
-    private val offset: Int,
-    private val oldValue: Int
+        override val txNumber: TransactionNumber,
+        private val block: Block,
+        private val offset: Int,
+        private val oldValue: Int
     ) : LogRecord() {
 
-    override fun writeToLog(logManager: LogManager): LSN =
+    override fun writeToLog(logManager: LogManager): LogSequenceNumber =
         logManager.append(SETINT, txNumber, block.filename, block.number, offset, oldValue)
 
-    override fun undo(txnum: TxNum, bufferManager: BufferManager) {
+    override fun undo(txnum: TransactionNumber, bufferManager: BufferManager) {
         val buffer = bufferManager.pin(block)
-        buffer.setValue(offset, SqlInt(oldValue), txnum, LSN.undefined)
+        buffer.setValue(offset, SqlInt(oldValue), txnum, LogSequenceNumber.undefined)
         bufferManager.unpin(buffer)
     }
 
     companion object {
 
         fun from(rec: BasicLogRecord): SetIntRecord {
-            val tx = TxNum(rec.nextInt())
+            val tx = TransactionNumber(rec.nextInt())
             val filename = FileName(rec.nextString())
             val blockNum = rec.nextInt()
             val offset = rec.nextInt()
@@ -168,25 +168,25 @@ class SetIntRecord(
  * Undo record for changing a string.
  */
 class SetStringRecord(
-    override val txNumber: TxNum,
-    private val block: Block,
-    private val offset: Int,
-    private val odValue: String
+        override val txNumber: TransactionNumber,
+        private val block: Block,
+        private val offset: Int,
+        private val odValue: String
     ) : LogRecord() {
 
-    override fun writeToLog(logManager: LogManager): LSN =
+    override fun writeToLog(logManager: LogManager): LogSequenceNumber =
         logManager.append(SETSTRING, txNumber, block.filename, block.number, offset, odValue)
 
-    override fun undo(txnum: TxNum, bufferManager: BufferManager) {
+    override fun undo(txnum: TransactionNumber, bufferManager: BufferManager) {
         val buffer = bufferManager.pin(block)
-        buffer.setValue(offset, SqlString(odValue), txnum, LSN.undefined)
+        buffer.setValue(offset, SqlString(odValue), txnum, LogSequenceNumber.undefined)
         bufferManager.unpin(buffer)
     }
 
     companion object {
 
         fun from(rec: BasicLogRecord): SetStringRecord {
-            val tx = TxNum(rec.nextInt())
+            val tx = TransactionNumber(rec.nextInt())
             val filename = FileName(rec.nextString())
             val blockNum = rec.nextInt()
             val offset = rec.nextInt()

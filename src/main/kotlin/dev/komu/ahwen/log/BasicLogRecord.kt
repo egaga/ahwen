@@ -11,7 +11,7 @@ import dev.komu.ahwen.types.SqlType
  *
  * Higher level log parsing can be implemented on top of this.
  */
-class BasicLogRecord(private val page: Page, private var pos: Int) {
+class BasicLogRecord(private val page: Page, private var position: Int) {
 
     fun nextInt(): Int =
         (nextValue(SqlType.INTEGER) as SqlInt).value
@@ -20,8 +20,8 @@ class BasicLogRecord(private val page: Page, private var pos: Int) {
         (nextValue(SqlType.VARCHAR) as SqlString).value
 
     private fun nextValue(type: SqlType): SqlValue {
-        val result = page.getValue(pos, type)
-        pos += result.representationSize
+        val result = page.getValue(position, type)
+        position += result.representationSize
         return result
     }
 }

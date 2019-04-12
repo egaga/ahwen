@@ -3,7 +3,7 @@ package dev.komu.ahwen.buffer
 import dev.komu.ahwen.file.Block
 import dev.komu.ahwen.file.FileManager
 import dev.komu.ahwen.log.LogManager
-import dev.komu.ahwen.tx.TxNum
+import dev.komu.ahwen.tx.TransactionNumber
 import dev.komu.ahwen.types.FileName
 import dev.komu.ahwen.utils.LRUSet
 import java.util.concurrent.locks.ReentrantLock
@@ -22,7 +22,7 @@ class BasicBufferManager(bufferCount: Int, fileManager: FileManager, logManager:
     private val bufferPool = List(bufferCount) { Buffer(fileManager, logManager) }
 
     /** Buffers sorted by their usage */
-    private val lru = LRUSet(bufferPool)
+    private val lruBuffers = LRUSet(bufferPool)
 
     /** A cache from blocks to their corresponding buffers. */
     private val buffersByBlocks = mutableMapOf<Block, Buffer>()
@@ -34,7 +34,7 @@ class BasicBufferManager(bufferCount: Int, fileManager: FileManager, logManager:
 
     private val lock = ReentrantLock()
 
-    fun flushAll(txnum: TxNum) {
+    fun flushAll(txnum: TransactionNumber) {
         lock.withLock {
             // TODO: having to walk through all buffers to commit tx is not nice
             for (buffer in bufferPool)
@@ -57,6 +57,7 @@ class BasicBufferManager(bufferCount: Int, fileManager: FileManager, logManager:
 
             if (!buffer.isPinned)
                 available--
+
             buffer.pin()
             return buffer
         }
@@ -64,8 +65,7 @@ class BasicBufferManager(bufferCount: Int, fileManager: FileManager, logManager:
 
     fun pinNew(fileName: FileName, formatter: PageFormatter): Buffer? {
         lock.withLock {
-            val buffer = chooseUnpinnedBuffer()
-                ?: return null
+            val buffer = chooseUnpinnedBuffer() ?: return null
 
             removeOldBlock(buffer)
             val newBlock = buffer.assignToNew(fileName, formatter)
@@ -81,7 +81,7 @@ class BasicBufferManager(bufferCount: Int, fileManager: FileManager, logManager:
             buffer.unpin()
             if (!buffer.isPinned) {
                 available++
-                lru.touch(buffer)
+                lruBuffers.touch(buffer)
             }
         }
     }
@@ -101,5 +101,5 @@ class BasicBufferManager(bufferCount: Int, fileManager: FileManager, logManager:
      * Returns an unpinned buffer to assign to another block.
      */
     private fun chooseUnpinnedBuffer(): Buffer? =
-        lru.find { !it.isPinned }
+        lruBuffers.find { !it.isPinned }
 }

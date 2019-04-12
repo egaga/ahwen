@@ -4,12 +4,12 @@ import dev.komu.ahwen.buffer.Buffer
 import dev.komu.ahwen.buffer.BufferManager
 import dev.komu.ahwen.file.Block
 import dev.komu.ahwen.log.BasicLogRecord
-import dev.komu.ahwen.log.LSN
+import dev.komu.ahwen.log.LogSequenceNumber
 import dev.komu.ahwen.log.LogManager
 import dev.komu.ahwen.query.SqlValue
 import dev.komu.ahwen.query.SqlInt
 import dev.komu.ahwen.query.SqlString
-import dev.komu.ahwen.tx.TxNum
+import dev.komu.ahwen.tx.TransactionNumber
 
 /**
  * Recovery manager is responsible for implementing commit, rollback and recovery from crashes.
@@ -33,9 +33,9 @@ import dev.komu.ahwen.tx.TxNum
  * that we want to rollback and execute them.
  */
 class RecoveryManager(
-    private var txnum: TxNum,
-    private val logManager: LogManager,
-    private val bufferManager: BufferManager
+        private var txnum: TransactionNumber,
+        private val logManager: LogManager,
+        private val bufferManager: BufferManager
 ) {
 
     init {
@@ -90,11 +90,11 @@ class RecoveryManager(
         logManager.flush(lsn)
     }
 
-    fun setValue(buffer: Buffer, offset: Int, newValue: SqlValue): LSN {
+    fun setValue(buffer: Buffer, offset: Int, newValue: SqlValue): LogSequenceNumber {
         val oldValue = buffer.getValue(offset, newValue.type)
         val block = buffer.block ?: error("no block for buffer")
         return if (isTemporaryBlock(block)) {
-            LSN.undefined
+            LogSequenceNumber.undefined
         } else {
             val record = createUndoRecord(block, offset, oldValue)
             record.writeToLog(logManager)
@@ -117,7 +117,7 @@ class RecoveryManager(
     }
 
     private fun doRecover() {
-        val committedTxs = mutableListOf<TxNum>()
+        val committedTxs = mutableListOf<TransactionNumber>()
 
         for (record in LogRecordIterator(logManager.iterator())) {
             when {

@@ -3,10 +3,10 @@ package dev.komu.ahwen.buffer
 import dev.komu.ahwen.file.Block
 import dev.komu.ahwen.file.FileManager
 import dev.komu.ahwen.file.Page
-import dev.komu.ahwen.log.LSN
+import dev.komu.ahwen.log.LogSequenceNumber
 import dev.komu.ahwen.log.LogManager
 import dev.komu.ahwen.query.SqlValue
-import dev.komu.ahwen.tx.TxNum
+import dev.komu.ahwen.tx.TransactionNumber
 import dev.komu.ahwen.types.FileName
 import dev.komu.ahwen.types.SqlType
 
@@ -30,7 +30,7 @@ import dev.komu.ahwen.types.SqlType
  *    since we don't need to reload it from the disk; it suffices to pin the buffer.
  *
  * Finally, if the buffer is modified by a transaction, we store the id of the transaction
- * along with the [LSN] of log so that we can flush the buffer when the transaction commits.
+ * along with the [LogSequenceNumber] of log so that we can flush the buffer when the transaction commits.
  */
 class Buffer(fileManager: FileManager, private val logManager: LogManager) {
 
@@ -38,15 +38,15 @@ class Buffer(fileManager: FileManager, private val logManager: LogManager) {
     var block: Block? = null
         private set
     private var pins = 0
-    private var modifiedBy: TxNum? = null
-    private var logSequenceNumber = LSN.zero
+    private var modifiedBy: TransactionNumber? = null
+    private var logSequenceNumber = LogSequenceNumber.zero
 
     fun getValue(offset: Int, type: SqlType): SqlValue =
         contents.getValue(offset, type)
 
-    fun setValue(offset: Int, value: SqlValue, txnum: TxNum, lsn: LSN) {
+    fun setValue(offset: Int, value: SqlValue, txnum: TransactionNumber, lsn: LogSequenceNumber) {
         modifiedBy = txnum
-        if (lsn >= LSN.zero)
+        if (lsn >= LogSequenceNumber.zero)
             logSequenceNumber = lsn
 
         contents[offset] = value
@@ -71,7 +71,7 @@ class Buffer(fileManager: FileManager, private val logManager: LogManager) {
     val isPinned: Boolean
         get() = pins > 0
 
-    fun isModifiedBy(txnum: TxNum) =
+    fun isModifiedBy(txnum: TransactionNumber) =
         txnum == modifiedBy
 
     fun assignToBlock(block: Block) {

@@ -6,7 +6,6 @@ import dev.komu.ahwen.query.SqlInt
 import dev.komu.ahwen.query.SqlString
 import dev.komu.ahwen.tx.Transaction
 import dev.komu.ahwen.types.ColumnName
-import dev.komu.ahwen.types.SqlType
 import java.io.Closeable
 
 /**
@@ -15,17 +14,17 @@ import java.io.Closeable
 class RecordFile(private val ti: TableInfo, private val tx: Transaction) : Closeable {
 
     private val filename = ti.fileName
-    private var rp: RecordPage
+    private var recordPage: RecordPage
     private var currentBlockNum = 0
 
     init {
         if (tx.size(filename) == 0)
             appendBlock()
-        rp = RecordPage(Block(filename, currentBlockNum), ti, tx)
+        recordPage = RecordPage(Block(filename, currentBlockNum), ti, tx)
     }
 
     override fun close() {
-        rp.close()
+        recordPage.close()
     }
 
     fun beforeFirst() {
@@ -34,10 +33,10 @@ class RecordFile(private val ti: TableInfo, private val tx: Transaction) : Close
 
     fun next(): Boolean {
         while (true) {
-            if (rp.next())
+            if (recordPage.next())
                 return true
 
-            if (atLastBlock)
+            if (currentlyAtLastBlock)
                 return false
 
             moveTo(currentBlockNum + 1)
@@ -45,19 +44,19 @@ class RecordFile(private val ti: TableInfo, private val tx: Transaction) : Close
     }
 
     fun getValue(column: ColumnName) =
-        rp.getValue(column, ti.schema.type(column))
+        recordPage.getValue(column, ti.schema.type(column))
 
     fun setValue(column: ColumnName, value: SqlValue) {
-        rp.setValue(column, value)
+        recordPage.setValue(column, value)
     }
 
     fun delete() {
-        rp.delete()
+        recordPage.delete()
     }
 
     fun insert() {
-        while (!rp.insert()) {
-            if (atLastBlock)
+        while (!recordPage.insert()) {
+            if (currentlyAtLastBlock)
                 appendBlock()
 
             moveTo(currentBlockNum + 1)
@@ -66,20 +65,20 @@ class RecordFile(private val ti: TableInfo, private val tx: Transaction) : Close
 
     fun moveToRid(rid: RID) {
         moveTo(rid.blockNumber)
-        rp.moveToId(rid.id)
+        recordPage.moveToId(rid.id)
     }
 
     val currentRid: RID
-        get() = RID(currentBlockNum, rp.currentId)
+        get() = RID(currentBlockNum, recordPage.currentId)
 
     private fun moveTo(b: Int) {
-        rp.close()
+        recordPage.close()
 
         currentBlockNum = b
-        rp = RecordPage(Block(filename, currentBlockNum), ti, tx)
+        recordPage = RecordPage(Block(filename, currentBlockNum), ti, tx)
     }
 
-    private val atLastBlock: Boolean
+    private val currentlyAtLastBlock: Boolean
         get() = currentBlockNum == tx.size(filename) - 1
 
     private fun appendBlock() {
