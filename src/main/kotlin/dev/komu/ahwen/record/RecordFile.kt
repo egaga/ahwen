@@ -44,8 +44,8 @@ class RecordFile(private val ti: TableInfo, private val tx: Transaction) : Close
         }
     }
 
-    fun getValue(column: ColumnName, type: SqlType) =
-        rp.getValue(column, type)
+    fun getValue(column: ColumnName) =
+        rp.getValue(column, ti.schema.type(column))
 
     fun setValue(column: ColumnName, value: SqlValue) {
         rp.setValue(column, value)
@@ -93,10 +93,10 @@ inline fun RecordFile.forEach(func: () -> Unit) {
 }
 
 fun RecordFile.getInt(column: ColumnName) =
-    (getValue(column, SqlType.INTEGER) as SqlInt).value
+    (getValue(column) as SqlInt).value
 
 fun RecordFile.getString(column: ColumnName) =
-    (getValue(column, SqlType.VARCHAR) as SqlString).value
+    (getValue(column) as SqlString).value
 
 fun RecordFile.insertRow(vararg values: Pair<ColumnName, SqlValue>) {
     insert()

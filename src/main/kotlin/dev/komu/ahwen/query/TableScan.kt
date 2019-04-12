@@ -25,7 +25,7 @@ class TableScan(ti: TableInfo, tx: Transaction) : UpdateScan {
     }
 
     override fun get(column: ColumnName) =
-        rf.getValue(column, schema.type(column))
+        rf.getValue(column)
 
     override fun contains(column: ColumnName): Boolean =
         column in schema
