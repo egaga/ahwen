@@ -1,0 +1,91 @@
+package database.layer_2_buffer
+
+import database.layer_0_file.Block
+import database.layer_0_file.Page
+import database.layer_1_log.LogManager
+import database.layer_1_log.LogSequenceNumber
+import database.layer_3_c_tx.TransactionNumber
+import database.layer_6_query.SqlValue
+import database.types.FileName
+import database.types.SqlType
+
+/**
+ * Buffer is reusable [Page] of data that can be _pinned_ to a certain [Block].
+ * Buffers are the primary mechanism of caching: [BasicBufferManager] maintains
+ * a pool of buffers that the database can then allocate to reduce reads from
+ * disk.
+ *
+ * Buffer may reside in one of three states:
+ *
+ * 1. It might not be assigned to any block. In this case the buffer has no meaningful
+ *    data and is a good candidate to use for anything that needs a buffer.
+ * 2. It is _pinned_ to a block. Pinning means that some transaction is actively using
+ *    the buffer and we may not use the buffer for other purposes until it is unpinned.
+ *    However, multiple transactions may use the buffer to the same block, increasing
+ *    the count of pins on the buffer.
+ * 3. It might be assigned to a block without being pinned. This means that we are free
+ *    to use the buffer for any purpose (i.e. we can assign it to some other block if
+ *    needed), but if we need the data for the already assigned block, we're in luck,
+ *    since we don't need to reload it from the disk; it suffices to pin the buffer.
+ *
+ * Finally, if the buffer is modified by a transaction, we store the id of the transaction
+ * along with the [LogSequenceNumber] of log so that we can flush the buffer when the transaction commits.
+ */
+class Buffer(fileManager: database.layer_0_file.FileManager, private val logManager: LogManager) {
+
+    private val contents = Page(fileManager)
+    var block: database.layer_0_file.Block? = null
+        private set
+    private var pins = 0
+    private var modifiedBy: TransactionNumber? = null
+    private var logSequenceNumber = LogSequenceNumber.zero
+
+    fun getValue(offset: Int, type: SqlType): SqlValue =
+        contents.getValue(offset, type)
+
+    fun setValue(offset: Int, value: SqlValue, txnum: TransactionNumber, lsn: LogSequenceNumber) {
+        modifiedBy = txnum
+        if (lsn >= LogSequenceNumber.zero)
+            logSequenceNumber = lsn
+
+        contents[offset] = value
+    }
+
+    fun flush() {
+        if (modifiedBy != null) {
+            logManager.flush(logSequenceNumber)
+            contents.write(block ?: error("no block"))
+            modifiedBy = null
+        }
+    }
+
+    fun pin() {
+        pins++
+    }
+
+    fun unpin() {
+        pins--
+    }
+
+    val isPinned: Boolean
+        get() = pins > 0
+
+    fun isModifiedBy(txnum: TransactionNumber) =
+        txnum == modifiedBy
+
+    fun assignToBlock(block: database.layer_0_file.Block) {
+        flush()
+        this.block = block
+        contents.read(block)
+        pins = 0
+    }
+
+    fun assignToNew(fileName: FileName, formatter: PageFormatter): database.layer_0_file.Block {
+        flush()
+        formatter.format(contents)
+        val newBlock = contents.append(fileName)
+        block = newBlock
+        pins = 0
+        return newBlock
+    }
+}
