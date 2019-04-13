@@ -1,6 +1,6 @@
 package dev.komu.ahwen.integration
 
-import dev.komu.ahwen.jdbc.AhwenConnection
+import dev.komu.ahwen.layer_9_jdbc.AhwenConnection
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File

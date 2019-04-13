@@ -1,12 +1,10 @@
 package dev.komu.ahwen.types
 
-import dev.komu.ahwen.file.Page.Companion.INT_SIZE
-import dev.komu.ahwen.query.SqlValue
-import dev.komu.ahwen.query.SqlInt
-import dev.komu.ahwen.query.SqlString
+import dev.komu.ahwen.layer_0_file.Page.Companion.INT_SIZE
+import dev.komu.ahwen.layer_6_query.SqlValue
+import dev.komu.ahwen.layer_6_query.SqlInt
+import dev.komu.ahwen.layer_6_query.SqlString
 import java.sql.Types
-import java.sql.Types.VARCHAR
-import java.time.chrono.JapaneseEra.values
 
 sealed class SqlType(val code: Int) {
     object INTEGER : SqlType(Types.INTEGER)
